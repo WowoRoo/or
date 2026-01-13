@@ -1,0 +1,19 @@
+{
+  "workspace": {
+    "max_width": 10000,
+    "max_height": 10000,
+    "default_width": 100,
+    "default_height": 100,
+    "default_tile_size": 32
+  },
+  "biometric": {
+    "algorithm_timeout": 30,
+    "preprocessing_enabled": true,
+    "skeletonization_algorithm": "zhang_suen"
+  },
+  "ui": {
+    "theme": "dark",
+    "auto_save_interval": 300
+  }
+}
+

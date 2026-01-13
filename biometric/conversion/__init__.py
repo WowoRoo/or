@@ -1,0 +1,2 @@
+"""Workspace to bitmap conversion."""
+

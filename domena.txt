@@ -1,0 +1,305 @@
+
+---
+
+Do czytania plików **Markdown** polecam Visual Studio Code z rozszerzeniem *(Shift+Ctrl+X)* **Markdown Preview Enhanced**. Domyślnym skrótem do włączenia podglądu pliku Markdown jest *Ctrl+K V*. W lewym dolnym rogu podglądu jest przycisk do konfiguracji, gdzie można zmienić wiele rzeczy takich jak ciemne/jasne tło.
+
+Maksymalna liczba punktów z projektu **(100%)** to **56**. Aby zdać należy uzyskać **23** punkty. Można użyć dowolnej technologii, języka i frameworków z tym, że algorytmy biometryczne powinny być zaimplementowane bez użycia dodatkowych bibliotek. Punktowane są realizacje **User Stories**. Można uzyskać niepełną liczbę punktów jeśli User Story nie jest zaimplementowany do końca.
+
+Wytłumaczenia pojęć związanych ze specyfikacją projektu (jest to część **Ubiquitous Language** specyfikacji projektu):
+1. **User Story** to krótki opis funkcjonalności widziany z kogoś perspektywy, zazwyczaj użytkownika. Opisuje **co** chcemy osiągnąć a nie w jaki sposób.
+1. **Ubiquitous Language** to wspólny i jednoznaczny słownik pojęć
+1. **Bounded Context** to tematycznie wydzielone fragmenty aplikacji
+1. **Domain Aggregate** to grupa tematycznie powiązanych obiektów.
+1. **Domain Entity** to unikatowy obiekt domenowy. Posiada Id. Przykładem takiego obiektu będzie użytkownik - dwóch użytkowników o tym samym imieniu i nazwisku to całkowicie niezależne od siebie obiekty.
+1. **Value Object** to obiekty nieunikatowe które definiują wartości, na przykład punkt to Value Object, ponieważ jest definiowany poprzez współrzędne X i Y i tylko to nas interesuje w takim punkcie.
+1. **Domain Event** to zdarzenia na które aplikacja powinna zareagować
+1. **High-level Domain Flow** to jest przepływ działań od początku do końcowego wyniku
+
+**Skład zespołu:**
+1.  Anonim
+1.  Anonim
+1.  Anonim
+
+---
+
+# **Ubiquitous Language**
+
+---
+
+1. **DESIGNER** = Użytkownik tworzący **WORKSPACE**
+1. **DEVELOPER** = Osoba odpowiedzialna za rozwój i utrzymanie edytora **WORKSPACE**
+1. **PAN PROWADZĄCY** = Osoba określająca i oceniająca wymagania dotyczące projektu
+1. **WORKSPACE** = Dwuwymiarowa przestrzeń robocza **TILEMAP** zawierająca **MAP OBJECT** oraz dodatkowe informacje takie jak rozmiar
+1. **TILEMAP** = Dyskretny układ współrzędnych 2D, zbudowany z komórek, w których można umieszczać **MAP OBJECT**  
+1. **MAP OBJECT** = Dowolny element umieszczony na **TILEMAP** w **WORKSPACE**, jest to **TILE** lub **FUNCTIONAL TILE**  
+1. **TILE** = Podstawowa jednostka **WORKSPACE** umieszczana w **TILEMAP** reprezentująca teren. Przetwarzana przez algorytmy biometryczne.
+1. **FUNCTIONAL TILE** = Nie-**TILE** element umieszczany na **WORKSPACE**, np. przeciwnicy, start, koniec. Nieprzetwarzana przez algorytmy biometryczne.
+1. **OBJECTS TEMPLATE** = Predefiniowana konfiguracja wielu **TILE** lub wielu **FUNCTIONAL TILE** umieszczana jako jedna całość (np. most, wodospad) 
+1. **FOREGROUND** = Obszar istotny, wynik **ZABORIZATION**
+1. **BACKGROUND** = Obszar nieistotny, może być poddany **skeletonizATOR**
+1. **LAYER** = Logiczna warstwa grupująca **MAP OBJECT**, umożliwia edycję różnych warstw oddzielnie  
+1. **TILE LIST** = Zestaw dostępnych typów **TILE** możliwych do umieszczenia na **WORKSPACE**  
+1. **FUNCTIONAL TILE LIST** = Zestaw dostępnych typów **FUNCTIONAL TILE** możliwych do umieszczenia na **WORKSPACE**  
+1. **OBJECT TEMPLATES LIST** = Zestaw dostępnych typów **OBJECTS TEMPLATE** możliwych do umieszczenia na **WORKSPACE**  
+1. **TOOL** = Narzędzie edycji, takie jak **BRUSH TOOL**, **ERASER TOOL**,**FLOOD TOOL**  
+1. **ACTIVE TOOL** = Aktywne narzędzie edycji, takie jak **BRUSH TOOL**, **ERASER TOOL**,**FLOOD TOOL**  
+1. **FLOOD TOOL** = Narzędzie do wypełniania lokalnego obszaru **TILEMAP** wybranym **TILE** w **WORKSPACE**  
+1. **BRUSH TOOL** = Narzędzie do umieszczania **TILE** w **TILEMAP**  
+1. **TRASH TOOL** = Narzędzie do umieszczania **FUNCTIONAL TILE** w **TILEMAP**  
+1. **ERASER TOOL** = Narzędzie do usuwania **MAP OBJECT** w **TILEMAP**  
+1. **WORKSPACE BITMAP** = Uproszczona binarna reprezentacja **TILEMAP** stosowana jako wejście do **CROSSINIZER**  
+1. **skeletonizATOR** = Algorytm przekształcający tło z **TILEMAP** w jednopikselowy szkielet  
+1. **SKELETOR** = Wynik **skeletonizATOR**  
+1. **ZABORIZATION** = Proces dzielenia regionu na podobszary na podstawie typu **TILE** lub rozdzielania obiektu od tła na obrazie  
+1. **CROSSINIZER** = Algorytm który na podstawie przejść między sąsiadującymi obiektami określa końcówki, skrzyżowania i rozgałęzienia  
+1. **FEATURES** = Charakterystyczne cechy **SKELETOR** oraz punkt sklasyfikowany poprzez **CROSSINIZER** (np. końcówka, bifurkacja)  
+1. **FEATURES VECTOR** = Numeryczna reprezentacja wszystkich **FEATURES** z danego obrazu lub **TILEMAP**  
+1. **BERLIN WALL** = Nieprzekraczalna granica **TILEMAP**. Wyznacza rozmiar zapisany w **WORKSPACE**  
+1. **PREPROCESSING** = Przygotowanie regionu do analizy, np. binaryzacja, filtracja, usuwanie szumu  
+1. **SELECTED TILES** = Bezpośrednio zaznaczony obszar siatki  
+1. **REGION** = Spójny obszar **TILEMAP**, wykorzystywany przez**FLOOD TOOL** i **ZABORIZATION**  
+1. **TILE CELL** = pojedynczy element z **TILEMAP** która może przetrzymywać jeden **MAP OBJECT**, posiadająca dwie współrzędne: X i Y.
+
+---
+
+## **Major User Stories (3 points each, max 21)**
+ 1. As **DESIGNER**, I want to import an RGB image and distinguish **FOREGROUND** from **BACKGROUND** by applying **ZABORIZATION** to it, so that I can quickly create **OBJECTS TEMPLATE**.  
+ 1. As **DESIGNER**, I want to apply **skeletonizATOR** to the **BACKGROUND**, so that I can see where points of interests like crossings and bifurcations are. 
+ 1. As **DESIGNER**, I want to automatically apply results of **CROSSINIZER** to my **BRUSH TOOL**, so that placed groups of **TILE** are correctly set in the correct rotation/direction.
+ 1. As **DESIGNER**, I want to use**FLOOD TOOL**, so that I can quickly fill regions with selected **TILE** by using **ZABORIZATION**. 
+ 1. As **DEVELOPER**, I want to apply **PREPROCESSING**, so that noise does not distort biometrics algorithms.
+ 1. As **DEVELOPER**, I want to run **skeletonizATOR** on **TILE**, so that I can compute structural representation of **WORKSPACE**.
+ 1. As **PAN PROWADZĄCY**, I want to test **ZABORIZATION** independently on images, so that I can check whether the implementation is correct.  
+
+## **Standard User Stories (2 points each, max 22)**
+ 1. As **DESIGNER**, I want to create **WORKSPACE**, so that I can start building a platformer level from scratch.  
+ 1. As **DESIGNER**, I want to save and load **WORKSPACE**, so that I can continue editing later.  
+ 1. As **DESIGNER**, I want to have a parametrization of **ZABORIZATION**, so that I adjust it for my specific use case.
+ 1. As **DESIGNER**, I want to have at least 2 **skeletonizATOR** algorithms, so that I can compare the results and choose the best suited.
+ 1. As **DESIGNER**, I want to place **OBJECTS TEMPLATE**, so that I can insert larger structures more quickly.  
+ 1. As **DEVELOPER**, I want to convert **WORKSPACE** region to **WORKSPACE BITMAP**, so that biometric algorithms can operate on it.  
+ 1. As **DEVELOPER**, I want to be able to load the default **WORKSPACE** automatically at launch, so that the debugging process will be faster.  
+ 1. As **DEVELOPER**, I want to update and preview results in real time, so that the user sees changes immediately. 
+ 1. As **DEVELOPER**, I want to have long tasks done asynchronously, so that the application does not freeze.  
+ 1. As **DEVELOPER**, I want to use Dependency Injection in order to achieve Inversion of Control so that the project architecture will be clean.
+ 1. As **PAN PROWADZĄCY**, I want to make unit tests of biometric algorithms so that I will be confident in their correctness.
+
+## **Minor User Stories (1 point each, max 13)**
+ 1. As **DESIGNER**, I want to place **TILE** using a **BRUSH TOOL**, so that I can quickly build terrain.  
+ 1. As **DESIGNER**, I want to erase **MAP OBJECT** using an **ERASER TOOL**, so that I can correct mistakes easily.  
+ 1. As **DESIGNER**, I want to switch between **LAYER**s, so that I can edit groups of **MAP OBJECT** independently.  
+ 1. As **DESIGNER**, I want to create and display **FEATURES VECTOR**, so that I can compare it with other **WORKSPACE** in order to assess the complexity.  
+ 1. As **DESIGNER**, I want the application to have a user-friendly interface, so it is easy to use for me.
+ 1. As **DESIGNER**, I want to place **FUNCTIONAL TILE** using **TRASH TOOL**, so that I can add player and enemies.
+ 1. As **DESIGNER**, I want to use **TILE LIST**, so that I can select different **TILE** types efficiently.  
+ 1. As **DESIGNER**, I want to highlight detected **FEATURES**, so that I know where intersections appear.  
+ 1. As **DESIGNER**, I want to undo and redo my actions, so that I can safely experiment.  
+ 1. As **DESIGNER**, I want to have **BERLIN WALL** automatically detected, so that I do not need to state it when I open or save the map.  
+ 1. As **DEVELOPER**, I want to automatically annotate **WORKSPACE** with detected **FEATURES**, so that **DESIGNER** receive useful information.
+ 1. As **DEVELOPER**, I want to ensure data consistency, so that **WORKSPACE** data and analysis results stay synchronized in real time.  
+ 1. As **PAN PROWADZĄCY**, I want to highlight **FEATURES** based on **CROSSINIZER**, so that I can understand what is labeled as an intersection.  
+
+---
+
+# **Bounded Contexts**
+
+---
+
+## **1. Editing Context**
+Responsible for everything related to editing and storing of **WORKSPACE**.
+
+UL terms: **WORKSPACE**, **TILEMAP**, **BERLIN WALL**, **TILE**, **FUNCTIONAL TILE**, **OBJECTS TEMPLATE**, **LAYER**, **TILE LIST**, **FUNCTIONAL TILE LIST**, **OBJECT TEMPLATES LIST**, **BRUSH TOOL**, **ERASER TOOL**,**FLOOD TOOL**, **TRASH TOOL** (all **ACTIVE TOOL**)
+
+**Typical responsibilities:**
+- Creating, saving, loading **WORKSPACE**
+- Editing **TILEMAP**
+- Managing placement and removal of **MAP OBJECT**
+- Handling **Layer** visibility and editing
+- Undo/redo operations
+
+
+## **2. Biometric Context**
+Handles all biometric algorithms used to analyze **TILEMAP** or imported images.
+
+UL terms: **WORKSPACE BITMAP**, **skeletonizATOR**, **SKELETOR**, **ZABORIZATION**, **CROSSINIZER**, **FEATURES**, **FEATURES**, **FEATURES VECTOR**, **PREPROCESSING**
+
+**Typical responsibilities:**
+- Converting **WORKSPACE** or an image into **WORKSPACE BITMAP**
+- Running **PREPROCESSING** (noise removal, filtering, etc.)
+- Computing **skeletonizATOR**
+- Detecting **FEATURES**
+- Running **CROSSINIZER**
+- Generating **FEATURES VECTOR** for biometric analysis
+
+## **3. Prefab Context**
+Dedicated to constructing reusable building blocks for **WORKSPACE**.
+
+Includes UL terms: **OBJECTS TEMPLATE**, **OBJECT TEMPLATES LIST**, **ZABORIZATION** (when used to convert images to **OBJECTS TEMPLATE**)
+
+**Typical responsibilities:**
+- Importing an image and transforming parts into **OBJECTS TEMPLATE**
+- Editing or configuring **OBJECTS TEMPLATE**
+- Saving and loading **OBJECTS TEMPLATE** definitions
+- Managing the **OBJECT TEMPLATES LIST**
+
+## **4. Visualization Context**
+
+Focused on real-time visual representation and overlays.
+UL terms: **FEATURES**, **FEATURES**, **WORKSPACE**, **LAYER**
+
+**Responsibilities:**
+- Displaying **WORKSPACE** and all its **LAYER** instances
+- Rendering and highlighting results of biometrics
+- Previewing changes in real-time
+- Ensuring asynchronous updates in order to not freeze the UI
+
+---
+
+
+# **Domain Model - Aggregates, Value Objects, Entities**
+
+---
+
+## **1. Map Aggregate**
+
+**Root Entity:** **WORKSPACE**
+**Description:** Represents the entire editable level. It is the main consistency boundary between the editor and biometrics.
+
+### **Contains**
+- **TILEMAP** (Entity)
+- **BERLIN WALL** (Value Object)
+- **LAYER** (Entity, multiple)
+- **MAP OBJECT** (Entity, multiple)
+- **FEATURES VECTOR** (Value Object, optional)
+- **WORKSPACE BITMAP** (Value Object)
+- **Map Metadata** (Value Object, name/author/size)
+
+### **Responsibilities**
+- Manage creating, loading, saving the **WORKSPACE**.
+- Maintain consistent placement/removal of a **MAP OBJECT**.
+- Synchronize biometric results (**SKELETOR**, **FEATURES**, **FEATURES**).
+- Define the **WORKSPACE** constraints via **BERLIN WALL**.
+
+---
+
+## **2. Layer Aggregate**
+**Root Entity:** **LAYER**
+**Description:** Each map is split into logical layers (**TILE**, **FUNCTIONAL TILE**).
+
+### **Contains**
+- **MAP OBJECT** (Value Object, ordered per layer)
+- **TILE LIST** **Reference** (Value Object)
+- **FUNCTIONAL TILE LIST** **Reference** (Value Object)
+
+### **Responsibilities**
+- Isolate editing operations per **LAYER**.
+- Contain all objects that visually belong to that **LAYER**.
+- Handle all elements of **TOOL** type.
+
+---
+
+## **3. **OBJECTS TEMPLATE** Aggregate**
+**Root Entity:** **OBJECTS TEMPLATE**
+**Description:** A predefined structure made of **TILE**.
+
+### **Contains**
+- **OBJECTS TEMPLATE** **Layout** (Value Object - a list of **TILE** and their local positions)
+- **Position Point** (Value Object) - point of origin
+
+### **Responsibilities**
+- Hold reusable building blocks.
+- Allow applying **OBJECTS TEMPLATE** to **TILEMAP** in one operation.
+
+---
+
+## **4. Biometrics Aggregate**
+**Root Entity:** **Biometric Processing Session**
+**Description:** Encapsulates all biometrics algorithms and ensures correctness of transformations.
+
+### **Contains**
+- **PREPROCESSING** **Parameters** (Value Object)
+- **ZABORIZATION** **Result** (Value Object)
+- **skeletonizATOR** **Result** / **SKELETOR** (Value Object)
+- **CROSSINIZER** **Result** (Value Object)
+- **Detected** **FEATURES** (Value Object list)
+- **FEATURES** (Value Object list)
+- **FEATURES VECTOR** (Value Object)
+
+### **Responsibilities**
+- Produce outputs from biometric algorithms for **WORKSPACE**.
+
+---
+
+# **Domain Events**
+
+---
+
+## **WORKSPACE** **Editing Events**
+- **WORKSPACE** **Created**
+- **WORKSPACE** **Loaded**
+- **WORKSPACE** **Saved**
+- **WORKSPACE** **GridInitialized**
+- **LAYER** **Added**
+- **LAYER** **Removed**
+- **LAYER** **Switched**
+- **TILE** **Placed**
+- **FUNCTIONAL TILE** **Placed**
+- **OBJECTS TEMPLATE** **Placed**
+- **MAP OBJECT** **Erased**
+- **UndoPerformed**
+- **RedoPerformed**
+- **BERLIN WALL** **Detected**
+
+## **Tool Events**
+- **BRUSH TOOL** **Activated**
+- **FLOOD TOOL** **Activated**
+- **TRASH TOOL** **Activated**
+- **ERASER TOOL** **Activated**
+- **FLOOD TOOL** **AreaComputed**
+- **REGION** **Filled**
+- **BRUSH TOOL** **RotationUpdated**
+
+## **Biometric Events**
+- **PREPROCESSING** **Completed**
+- **ZABORIZATION** **Completed**
+- **WORKSPACE BITMAP** **Generated**
+- **SKELETOR** **Generated**
+- **CROSSINIZER** **Computed**
+- **FEATURES**s **Detected**
+- **FEATURES** **Detected**
+- **FEATURES VECTOR** **Created**
+
+## **System Events**
+- **RealTimePreviewUpdated**
+
+## **Domain Expert Validation Events** 
+- **ZABORIZATION** **Displayed**
+- **FEATURES** **Highlighted**
+
+---
+
+# **High-level Domain Flow**
+
+---
+
+## **1. **WORKSPACE** Manipulation**
+1. **WORKSPACE** **Created**
+2. **WORKSPACE** **GridInitialized**
+3. **LAYER** **Added**
+4. **TILE** **Placed** / **FUNCTIONAL TILE** **Placed** / **OBJECTS TEMPLATE** **Placed**
+5. **MAP OBJECT** **Erased** (optional)
+6. **BERLIN WALL** **Detected**
+7. **WORKSPACE** **Saved**
+
+## **2. Process Image**
+1. **RGBImageImported**
+2. **Run** **PREPROCESSING**
+3. **PREPROCESSING** **Completed**
+4. **Run** **ZABORIZATION**
+5. **ZABORIZATION** **Completed**  
+
+## **3. Biometric Pipeline**
+1. **skeletonizATOR** **Completed**  
+2. **CROSSINIZER** **Computed**  
+3. **FEATURES** **Detected**  
+4. **FEATURES VECTOR** **Created**  
