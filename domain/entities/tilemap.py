@@ -132,20 +132,20 @@ class Tilemap:
     
     def to_bitmap(self) -> WorkspaceBitmap:
         """Convert tilemap to binary bitmap."""
-        bitmap = np.zeros((self.height, self.width), dtype=bool)
+        # Initialize all pixels as BACKGROUND (True = 1)
+        # Only tiles (FOREGROUND) will be set to False (0)
+        bitmap = np.ones((self.height, self.width), dtype=bool)
         
-        for (x, y), cell in self.cells.items():
-            # BACKGROUND = 1 (empty or non-tile), FOREGROUND = 0 (tile)
-            # For skeletonization, we want BACKGROUND to be 1
-            if cell.is_empty():
-                bitmap[y, x] = True  # BACKGROUND
-            else:
-                # Check if it's a tile (foreground)
-                from domain.enums.map_object_type import MapObjectType
-                if cell.map_object.get_type() == MapObjectType.TILE:
-                    bitmap[y, x] = False  # FOREGROUND
-                else:
-                    bitmap[y, x] = True  # BACKGROUND
+        # Iterate through all coordinates, not just existing cells
+        for y in range(self.height):
+            for x in range(self.width):
+                cell = self.get_cell(x, y)
+                if cell and not cell.is_empty():
+                    # Check if it's a tile (foreground)
+                    from domain.enums.map_object_type import MapObjectType
+                    if cell.map_object.get_type() == MapObjectType.TILE:
+                        bitmap[y, x] = False  # FOREGROUND (tile)
+                    # else: remains True (BACKGROUND) - functional tiles are background
         
         return WorkspaceBitmap(bitmap, self.width, self.height)
 

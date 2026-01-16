@@ -5,8 +5,16 @@ from domain.value_objects.workspace_bitmap import WorkspaceBitmap
 
 
 def hildritch(bitmap: WorkspaceBitmap) -> WorkspaceBitmap:
-    """Apply Hildritch thinning algorithm."""
+    """Apply Hildritch thinning algorithm.
+    
+    Hildritch skeletonizes pixels with value 1 (foreground in algorithm terms).
+    Input bitmap should have 1 = pixels to skeletonize, 0 = background.
+    """
+    # Convert to uint8 for processing
     skeleton = bitmap.data.copy().astype(np.uint8)
+    
+    # Ensure we're working with 0/1 values
+    skeleton = (skeleton > 0).astype(np.uint8)
     
     changed = True
     iteration = 0
@@ -19,7 +27,7 @@ def hildritch(bitmap: WorkspaceBitmap) -> WorkspaceBitmap:
         to_remove = []
         for y in range(1, skeleton.shape[0] - 1):
             for x in range(1, skeleton.shape[1] - 1):
-                if skeleton[y, x] == 1:  # BACKGROUND pixel
+                if skeleton[y, x] == 1:  # Pixel to skeletonize
                     if _hildritch_conditions(skeleton, x, y):
                         to_remove.append((x, y))
         

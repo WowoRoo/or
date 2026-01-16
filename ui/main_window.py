@@ -608,38 +608,93 @@ class MainWindow(QMainWindow):
         try:
             bitmap = self.workspace.workspace_bitmap or self.workspace.tilemap.to_bitmap()
             result = self.segmentation_service.segment(bitmap)
-            # Store result somewhere or display
-            QMessageBox.information(self, "Success", f"Zaborization completed: {len(result.foreground_regions)} foreground regions")
+            # Store result for visualization
+            self.canvas.zaborization_result = result
+            # Enable foreground visualization by default
+            self.canvas.show_zaborization_foreground = True
+            self.canvas.show_zaborization_background = False
+            # Update checkboxes
+            self.properties_panel._update_biometric_checkboxes()
+            QMessageBox.information(
+                self, "Success", 
+                f"Zaborization completed: {len(result.foreground_regions)} foreground regions, "
+                f"{len(result.background_regions)} background regions"
+            )
+            self.canvas.update()
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Zaborization failed: {e}")
     
     def _run_skeletonization(self):
-        """Run skeletonization."""
+        """Run skeletonization for both foreground and background."""
         if not self.workspace:
             return
         try:
             bitmap = self.workspace.workspace_bitmap or self.workspace.tilemap.to_bitmap()
-            result = self.skeletonization_service.skeletonize(bitmap, self.current_algorithm)
-            # Store result for overlay
-            self.canvas.skeleton_result = result
-            QMessageBox.information(self, "Success", f"Skeletonization completed using {result.algorithm_used}")
+            
+            # Get zaborization result to separate foreground and background
+            if not self.canvas.zaborization_result:
+                # Run zaborization first if not done
+                zabor_result = self.segmentation_service.segment(bitmap)
+                self.canvas.zaborization_result = zabor_result
+            
+            # Skeletonize foreground
+            foreground_mask = self.canvas.zaborization_result.get_foreground_mask()
+            skeleton_foreground = self.skeletonization_service.skeletonize(foreground_mask, self.current_algorithm)
+            self.canvas.skeleton_result_foreground = skeleton_foreground
+            
+            # Skeletonize background
+            background_mask = self.canvas.zaborization_result.get_background_mask()
+            skeleton_background = self.skeletonization_service.skeletonize(background_mask, self.current_algorithm)
+            self.canvas.skeleton_result_background = skeleton_background
+            
+            # Enable foreground visualization by default
+            self.canvas.show_skeleton_foreground = True
+            self.canvas.show_skeleton_background = False
+            # Update checkboxes
+            self.properties_panel._update_biometric_checkboxes()
+            
+            QMessageBox.information(
+                self, "Success", 
+                f"Skeletonization completed using {skeleton_foreground.algorithm_used}\n"
+                f"Foreground: {len(skeleton_foreground.get_skeleton_points())} points\n"
+                f"Background: {len(skeleton_background.get_skeleton_points())} points"
+            )
             self.canvas.update()
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Skeletonization failed: {e}")
     
     def _run_crossinizer(self):
-        """Run crossinizer."""
-        if not hasattr(self.canvas, 'skeleton_result') or not self.canvas.skeleton_result:
+        """Run crossinizer for both foreground and background."""
+        if not hasattr(self.canvas, 'skeleton_result_foreground') or not self.canvas.skeleton_result_foreground:
             QMessageBox.warning(self, "Warning", "Please run skeletonization first")
             return
         try:
-            result = self.crossinizer_service.analyze(self.canvas.skeleton_result)
-            # Store for features overlay
-            self.canvas.crossinizer_result = result
+            # Analyze foreground skeleton
+            result_foreground = self.crossinizer_service.analyze(self.canvas.skeleton_result_foreground)
+            self.canvas.crossinizer_result_foreground = result_foreground
+            
+            # Analyze background skeleton if available
+            if self.canvas.skeleton_result_background:
+                result_background = self.crossinizer_service.analyze(self.canvas.skeleton_result_background)
+                self.canvas.crossinizer_result_background = result_background
+            else:
+                self.canvas.crossinizer_result_background = None
+            
+            # Enable foreground visualization by default
+            self.canvas.show_features_foreground = True
+            self.canvas.show_features_background = False
+            # Update checkboxes
+            self.properties_panel._update_biometric_checkboxes()
+            
             QMessageBox.information(
                 self, "Success",
-                f"Crossinizer completed: {len(result.endpoints)} endpoints, "
-                f"{len(result.bifurcations)} bifurcations, {len(result.crossings)} crossings"
+                f"Crossinizer completed:\n"
+                f"Foreground: {len(result_foreground.endpoints)} endpoints, "
+                f"{len(result_foreground.bifurcations)} bifurcations, "
+                f"{len(result_foreground.crossings)} crossings\n"
+                f"Background: {len(result_background.endpoints) if result_background else 0} endpoints, "
+                f"{len(result_background.bifurcations) if result_background else 0} bifurcations, "
+                f"{len(result_background.crossings) if result_background else 0} crossings"
             )
             self.canvas.update()
         except Exception as e:
@@ -647,13 +702,14 @@ class MainWindow(QMainWindow):
     
     def _generate_features_vector(self):
         """Generate features vector."""
-        if not hasattr(self.canvas, 'crossinizer_result') or not self.canvas.crossinizer_result:
+        if not hasattr(self.canvas, 'crossinizer_result_foreground') or not self.canvas.crossinizer_result_foreground:
             QMessageBox.warning(self, "Warning", "Please run crossinizer first")
             return
         try:
+            # Use foreground features for vector generation (or combine both)
             features = self.feature_detector.detect_features(
-                self.canvas.crossinizer_result,
-                self.canvas.skeleton_result
+                self.canvas.crossinizer_result_foreground,
+                self.canvas.skeleton_result_foreground
             )
             features_vector = self.vector_generator.generate(features, self.workspace)
             self.workspace.features_vector = features_vector

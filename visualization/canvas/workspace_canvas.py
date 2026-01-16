@@ -19,13 +19,20 @@ class WorkspaceCanvas(QWidget):
         self.pan_offset = QPoint(0, 0)
         self.tile_size = 32
         self.show_grid = True
-        self.show_features = False
-        self.show_skeleton = False
+        self.show_features_foreground = False
+        self.show_features_background = False
+        self.show_skeleton_foreground = False
+        self.show_skeleton_background = False
+        self.show_zaborization_foreground = False
+        self.show_zaborization_background = False
         self.last_pan_pos = None
         self.last_click_pos = None
         self.is_dragging = False
-        self.skeleton_result = None
-        self.crossinizer_result = None
+        self.skeleton_result_foreground = None
+        self.skeleton_result_background = None
+        self.crossinizer_result_foreground = None
+        self.crossinizer_result_background = None
+        self.zaborization_result = None  # Contains both foreground and background
         self.template_preview_position = None  # Point for template preview
         self.template_preview_template = None  # ObjectsTemplate for preview
         self.template_preview_color = None  # (r, g, b) for preview coloring
@@ -74,10 +81,18 @@ class WorkspaceCanvas(QWidget):
             self._draw_workspace(painter)
         
         # Draw overlays
-        if self.show_skeleton:
-            self._draw_skeleton(painter)
-        if self.show_features:
-            self._draw_features(painter)
+        if self.show_zaborization_foreground:
+            self._draw_zaborization(painter, foreground=True)
+        if self.show_zaborization_background:
+            self._draw_zaborization(painter, foreground=False)
+        if self.show_skeleton_foreground:
+            self._draw_skeleton(painter, foreground=True)
+        if self.show_skeleton_background:
+            self._draw_skeleton(painter, foreground=False)
+        if self.show_features_foreground:
+            self._draw_features(painter, foreground=True)
+        if self.show_features_background:
+            self._draw_features(painter, foreground=False)
         
         # Draw template preview
         if self.template_preview_template and self.template_preview_position:
@@ -166,53 +181,125 @@ class WorkspaceCanvas(QWidget):
         
         return (200, 200, 200)
     
-    def _draw_skeleton(self, painter: QPainter) -> None:
-        """Draw skeleton overlay."""
-        if not self.skeleton_result:
+    def _draw_skeleton(self, painter: QPainter, foreground: bool = True) -> None:
+        """Draw skeleton overlay (foreground or background) with improved visibility."""
+        skeleton_result = self.skeleton_result_foreground if foreground else self.skeleton_result_background
+        if not skeleton_result:
             return
         
-        painter.setPen(QPen(QColor(255, 255, 0), 1))  # Yellow lines
-        bitmap = self.skeleton_result.skeleton_bitmap
+        bitmap = skeleton_result.skeleton_bitmap
         
+        # Use thicker pen and brighter colors for better visibility
+        if foreground:
+            pen = QPen(QColor(255, 255, 0), 3)  # Yellow, thicker
+            brush = QBrush(QColor(255, 255, 0))
+        else:
+            pen = QPen(QColor(255, 165, 0), 3)  # Orange, thicker
+            brush = QBrush(QColor(255, 165, 0))
+        
+        painter.setPen(pen)
+        painter.setBrush(brush)
+        
+        # Draw skeleton points as circles and connect adjacent pixels with lines
+        skeleton_points = []
         for y in range(bitmap.height):
             for x in range(bitmap.width):
                 if bitmap.get_pixel(x, y):
-                    screen_x = x * self.tile_size
-                    screen_y = y * self.tile_size
-                    painter.drawPoint(screen_x + self.tile_size // 2, screen_y + self.tile_size // 2)
+                    screen_x = x * self.tile_size + self.tile_size // 2
+                    screen_y = y * self.tile_size + self.tile_size // 2
+                    skeleton_points.append((x, y, screen_x, screen_y))
+                    
+                    # Draw point as a circle for better visibility
+                    radius = max(3, self.tile_size // 8)
+                    painter.drawEllipse(screen_x - radius, screen_y - radius, radius * 2, radius * 2)
+        
+        # Connect adjacent skeleton pixels with lines for better visibility
+        painter.setPen(QPen(pen.color(), 2))  # Slightly thinner for lines
+        for x, y, screen_x, screen_y in skeleton_points:
+            # Check 8-neighborhood for adjacent skeleton pixels
+            neighbors = [
+                (x-1, y-1), (x, y-1), (x+1, y-1),
+                (x-1, y),             (x+1, y),
+                (x-1, y+1), (x, y+1), (x+1, y+1)
+            ]
+            for nx, ny in neighbors:
+                if (0 <= nx < bitmap.width and 0 <= ny < bitmap.height and 
+                    bitmap.get_pixel(nx, ny)):
+                    neighbor_screen_x = nx * self.tile_size + self.tile_size // 2
+                    neighbor_screen_y = ny * self.tile_size + self.tile_size // 2
+                    painter.drawLine(screen_x, screen_y, neighbor_screen_x, neighbor_screen_y)
     
-    def _draw_features(self, painter: QPainter) -> None:
-        """Draw features overlay."""
-        if not self.crossinizer_result:
+    def _draw_zaborization(self, painter: QPainter, foreground: bool = True) -> None:
+        """Draw zaborization overlay (foreground or background regions)."""
+        if not self.zaborization_result:
             return
         
-        # Draw endpoints (green)
-        painter.setPen(QPen(QColor(0, 255, 0), 3))
-        painter.setBrush(QBrush(QColor(0, 255, 0)))
-        for point in self.crossinizer_result.endpoints:
+        # Choose regions based on foreground flag
+        regions = self.zaborization_result.foreground_regions if foreground else self.zaborization_result.background_regions
+        
+        # Draw regions with semi-transparent overlay
+        if foreground:
+            painter.setPen(QPen(QColor(255, 0, 255, 100), 1))  # Magenta with transparency
+            painter.setBrush(QBrush(QColor(255, 0, 255, 50)))  # Semi-transparent fill
+        else:
+            painter.setPen(QPen(QColor(0, 255, 255, 100), 1))  # Cyan with transparency
+            painter.setBrush(QBrush(QColor(0, 255, 255, 50)))  # Semi-transparent fill
+        
+        for region in regions:
+            # Draw each cell in the region
+            for point in region.cells:
+                screen_x = point.x * self.tile_size
+                screen_y = point.y * self.tile_size
+                painter.drawRect(screen_x, screen_y, self.tile_size, self.tile_size)
+    
+    def _draw_features(self, painter: QPainter, foreground: bool = True) -> None:
+        """Draw features overlay (foreground or background)."""
+        crossinizer_result = self.crossinizer_result_foreground if foreground else self.crossinizer_result_background
+        if not crossinizer_result:
+            return
+        
+        # Draw endpoints (green for foreground, light green for background)
+        if foreground:
+            painter.setPen(QPen(QColor(0, 255, 0), 3))
+            painter.setBrush(QBrush(QColor(0, 255, 0)))
+        else:
+            painter.setPen(QPen(QColor(144, 238, 144), 3))
+            painter.setBrush(QBrush(QColor(144, 238, 144)))
+        for point in crossinizer_result.endpoints:
             screen_x = point.x * self.tile_size + self.tile_size // 2
             screen_y = point.y * self.tile_size + self.tile_size // 2
             painter.drawEllipse(screen_x - 3, screen_y - 3, 6, 6)
         
-        # Draw bifurcations (blue)
-        painter.setPen(QPen(QColor(0, 0, 255), 3))
-        painter.setBrush(QBrush(QColor(0, 0, 255)))
-        for point in self.crossinizer_result.bifurcations:
+        # Draw bifurcations (blue for foreground, light blue for background)
+        if foreground:
+            painter.setPen(QPen(QColor(0, 0, 255), 3))
+            painter.setBrush(QBrush(QColor(0, 0, 255)))
+        else:
+            painter.setPen(QPen(QColor(173, 216, 230), 3))
+            painter.setBrush(QBrush(QColor(173, 216, 230)))
+        for point in crossinizer_result.bifurcations:
             screen_x = point.x * self.tile_size + self.tile_size // 2
             screen_y = point.y * self.tile_size + self.tile_size // 2
             painter.drawEllipse(screen_x - 3, screen_y - 3, 6, 6)
         
-        # Draw crossings (red)
-        painter.setPen(QPen(QColor(255, 0, 0), 3))
-        painter.setBrush(QBrush(QColor(255, 0, 0)))
-        for point in self.crossinizer_result.crossings:
+        # Draw crossings (red for foreground, pink for background)
+        if foreground:
+            painter.setPen(QPen(QColor(255, 0, 0), 3))
+            painter.setBrush(QBrush(QColor(255, 0, 0)))
+        else:
+            painter.setPen(QPen(QColor(255, 192, 203), 3))
+            painter.setBrush(QBrush(QColor(255, 192, 203)))
+        for point in crossinizer_result.crossings:
             screen_x = point.x * self.tile_size + self.tile_size // 2
             screen_y = point.y * self.tile_size + self.tile_size // 2
             painter.drawEllipse(screen_x - 3, screen_y - 3, 6, 6)
         
         # Draw connections (thin lines)
-        painter.setPen(QPen(QColor(200, 200, 200), 1))
-        for start, end in self.crossinizer_result.connections:
+        if foreground:
+            painter.setPen(QPen(QColor(200, 200, 200), 1))
+        else:
+            painter.setPen(QPen(QColor(255, 200, 200), 1))
+        for start, end in crossinizer_result.connections:
             start_x = start.x * self.tile_size + self.tile_size // 2
             start_y = start.y * self.tile_size + self.tile_size // 2
             end_x = end.x * self.tile_size + self.tile_size // 2

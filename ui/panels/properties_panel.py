@@ -284,8 +284,45 @@ class PropertiesPanel(QWidget):
     
     def _create_biometric_properties_tab(self) -> QWidget:
         """Create biometric properties tab."""
+        from PyQt6.QtWidgets import QCheckBox
+        
         widget = QWidget()
         layout = QVBoxLayout(widget)
+        
+        # Visualization toggles
+        layout.addWidget(QLabel("Visualization:"))
+        
+        # Zaborization
+        layout.addWidget(QLabel("Zaborization:"))
+        self.show_zaborization_foreground_checkbox = QCheckBox("  Foreground")
+        self.show_zaborization_foreground_checkbox.stateChanged.connect(self._on_zaborization_foreground_visibility_changed)
+        layout.addWidget(self.show_zaborization_foreground_checkbox)
+        
+        self.show_zaborization_background_checkbox = QCheckBox("  Background")
+        self.show_zaborization_background_checkbox.stateChanged.connect(self._on_zaborization_background_visibility_changed)
+        layout.addWidget(self.show_zaborization_background_checkbox)
+        
+        # Skeleton
+        layout.addWidget(QLabel("Skeleton:"))
+        self.show_skeleton_foreground_checkbox = QCheckBox("  Foreground")
+        self.show_skeleton_foreground_checkbox.stateChanged.connect(self._on_skeleton_foreground_visibility_changed)
+        layout.addWidget(self.show_skeleton_foreground_checkbox)
+        
+        self.show_skeleton_background_checkbox = QCheckBox("  Background")
+        self.show_skeleton_background_checkbox.stateChanged.connect(self._on_skeleton_background_visibility_changed)
+        layout.addWidget(self.show_skeleton_background_checkbox)
+        
+        # Features
+        layout.addWidget(QLabel("Features:"))
+        self.show_features_foreground_checkbox = QCheckBox("  Foreground")
+        self.show_features_foreground_checkbox.stateChanged.connect(self._on_features_foreground_visibility_changed)
+        layout.addWidget(self.show_features_foreground_checkbox)
+        
+        self.show_features_background_checkbox = QCheckBox("  Background")
+        self.show_features_background_checkbox.stateChanged.connect(self._on_features_background_visibility_changed)
+        layout.addWidget(self.show_features_background_checkbox)
+        
+        layout.addWidget(QLabel(""))  # Spacer
         
         # Algorithm selection
         layout.addWidget(QLabel("Skeletonization Algorithm:"))
@@ -302,6 +339,99 @@ class PropertiesPanel(QWidget):
         
         layout.addStretch()
         return widget
+    
+    def _on_zaborization_foreground_visibility_changed(self, state):
+        """Handle zaborization foreground visibility toggle."""
+        widget = self.parent()  # QSplitter
+        if widget:
+            widget = widget.parent()  # MainWindow
+        
+        if widget and hasattr(widget, 'canvas'):
+            widget.canvas.show_zaborization_foreground = (state == Qt.CheckState.Checked.value)
+            widget.canvas.update()
+    
+    def _on_zaborization_background_visibility_changed(self, state):
+        """Handle zaborization background visibility toggle."""
+        widget = self.parent()  # QSplitter
+        if widget:
+            widget = widget.parent()  # MainWindow
+        
+        if widget and hasattr(widget, 'canvas'):
+            widget.canvas.show_zaborization_background = (state == Qt.CheckState.Checked.value)
+            widget.canvas.update()
+    
+    def _on_skeleton_foreground_visibility_changed(self, state):
+        """Handle skeleton foreground visibility toggle."""
+        widget = self.parent()  # QSplitter
+        if widget:
+            widget = widget.parent()  # MainWindow
+        
+        if widget and hasattr(widget, 'canvas'):
+            widget.canvas.show_skeleton_foreground = (state == Qt.CheckState.Checked.value)
+            widget.canvas.update()
+    
+    def _on_skeleton_background_visibility_changed(self, state):
+        """Handle skeleton background visibility toggle."""
+        widget = self.parent()  # QSplitter
+        if widget:
+            widget = widget.parent()  # MainWindow
+        
+        if widget and hasattr(widget, 'canvas'):
+            widget.canvas.show_skeleton_background = (state == Qt.CheckState.Checked.value)
+            widget.canvas.update()
+    
+    def _on_features_foreground_visibility_changed(self, state):
+        """Handle features foreground visibility toggle."""
+        widget = self.parent()  # QSplitter
+        if widget:
+            widget = widget.parent()  # MainWindow
+        
+        if widget and hasattr(widget, 'canvas'):
+            widget.canvas.show_features_foreground = (state == Qt.CheckState.Checked.value)
+            widget.canvas.update()
+    
+    def _on_features_background_visibility_changed(self, state):
+        """Handle features background visibility toggle."""
+        widget = self.parent()  # QSplitter
+        if widget:
+            widget = widget.parent()  # MainWindow
+        
+        if widget and hasattr(widget, 'canvas'):
+            widget.canvas.show_features_background = (state == Qt.CheckState.Checked.value)
+            widget.canvas.update()
+    
+    def _update_biometric_checkboxes(self):
+        """Update biometric checkboxes to match canvas state."""
+        widget = self.parent()  # QSplitter
+        if widget:
+            widget = widget.parent()  # MainWindow
+        
+        if widget and hasattr(widget, 'canvas'):
+            canvas = widget.canvas
+            if hasattr(self, 'show_zaborization_foreground_checkbox'):
+                self.show_zaborization_foreground_checkbox.setCheckState(
+                    Qt.CheckState.Checked if canvas.show_zaborization_foreground else Qt.CheckState.Unchecked
+                )
+            if hasattr(self, 'show_zaborization_background_checkbox'):
+                self.show_zaborization_background_checkbox.setCheckState(
+                    Qt.CheckState.Checked if canvas.show_zaborization_background else Qt.CheckState.Unchecked
+                )
+            if hasattr(self, 'show_skeleton_foreground_checkbox'):
+                self.show_skeleton_foreground_checkbox.setCheckState(
+                    Qt.CheckState.Checked if canvas.show_skeleton_foreground else Qt.CheckState.Unchecked
+                )
+            if hasattr(self, 'show_skeleton_background_checkbox'):
+                self.show_skeleton_background_checkbox.setCheckState(
+                    Qt.CheckState.Checked if canvas.show_skeleton_background else Qt.CheckState.Unchecked
+                )
+            if hasattr(self, 'show_features_foreground_checkbox'):
+                self.show_features_foreground_checkbox.setCheckState(
+                    Qt.CheckState.Checked if canvas.show_features_foreground else Qt.CheckState.Unchecked
+                )
+            if hasattr(self, 'show_features_background_checkbox'):
+                self.show_features_background_checkbox.setCheckState(
+                    Qt.CheckState.Checked if canvas.show_features_background else Qt.CheckState.Unchecked
+                )
     
     def set_workspace(self, workspace: Workspace):
         """Update workspace."""
@@ -321,6 +451,9 @@ class PropertiesPanel(QWidget):
                 text += f"Total: {fv.total_features}\n"
                 text += f"Vector: {fv.vector.tolist()}"
                 self.features_text.setText(text)
+            
+            # Update visualization checkboxes
+            self._update_biometric_checkboxes()
             
             # Update template list
             self._update_template_list()
