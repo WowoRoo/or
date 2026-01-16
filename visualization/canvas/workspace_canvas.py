@@ -33,10 +33,28 @@ class WorkspaceCanvas(QWidget):
         
         self.setMinimumSize(400, 300)
         self.setMouseTracking(True)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
     
     def set_active_tool(self, tool: BaseTool) -> None:
         """Set active tool."""
         self.active_tool = tool
+    
+    def focusOutEvent(self, event):
+        """Handle focus loss - deactivate template tool if active."""
+        from editing.tools.template_tool import TemplateTool
+        from domain.enums.tool_type import ToolType
+        
+        if isinstance(self.active_tool, TemplateTool):
+            # Find tool manager and switch to brush tool
+            widget = self.parent()
+            while widget:
+                if hasattr(widget, 'tool_manager'):
+                    widget.tool_manager.set_active_tool(ToolType.BRUSH)
+                    self.update()
+                    break
+                widget = widget.parent()
+        
+        super().focusOutEvent(event)
     
     def paintEvent(self, event):
         """Paint workspace."""
@@ -121,6 +139,10 @@ class WorkspaceCanvas(QWidget):
         from domain.enums.functional_tile_type import FunctionalTileType
         
         if isinstance(obj, Tile):
+            # Use custom color if set, otherwise use default
+            if hasattr(obj, 'custom_color') and obj.custom_color:
+                return obj.custom_color
+            
             colors = {
                 TileType.GRASS: (34, 139, 34),      # Green
                 TileType.STONE: (128, 128, 128),    # Gray
@@ -234,20 +256,28 @@ class WorkspaceCanvas(QWidget):
                 self.last_click_pos = point
         else:
             # Update template preview on mouse move (without button pressed)
-            point = self._screen_to_world(event.pos())
-            if point and self.active_tool:
-                from editing.tools.template_tool import TemplateTool
-                if isinstance(self.active_tool, TemplateTool) and self.active_tool.template:
-                    self.template_preview_position = point
-                    self.template_preview_template = self.active_tool.template
-                    self.template_preview_color = self.active_tool.template_color
-                    self.template_preview_scale = self.active_tool.scale
-                    self.update()
-                else:
-                    if self.template_preview_template:
-                        self.template_preview_template = None
-                        self.template_preview_position = None
+            # Only if mouse is actually over the canvas
+            if self.rect().contains(event.pos()):
+                point = self._screen_to_world(event.pos())
+                if point and self.active_tool:
+                    from editing.tools.template_tool import TemplateTool
+                    if isinstance(self.active_tool, TemplateTool) and self.active_tool.template:
+                        self.template_preview_position = point
+                        self.template_preview_template = self.active_tool.template
+                        self.template_preview_color = self.active_tool.template_color
+                        self.template_preview_scale = self.active_tool.scale
                         self.update()
+                    else:
+                        if self.template_preview_template:
+                            self.template_preview_template = None
+                            self.template_preview_position = None
+                            self.update()
+            else:
+                # Mouse left canvas - clear preview
+                if self.template_preview_template:
+                    self.template_preview_template = None
+                    self.template_preview_position = None
+                    self.update()
     
     def mouseReleaseEvent(self, event):
         """Handle mouse release."""

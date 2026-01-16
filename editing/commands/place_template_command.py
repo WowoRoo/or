@@ -114,7 +114,8 @@ class PlaceTemplateCommand(Command):
                 active_layer.add_map_object(func_tile)
                 self.workspace.tilemap.set_cell(abs_pos.x, abs_pos.y, func_tile)
             else:
-                tile = Tile(tile_or_func_type, abs_pos, active_layer.id)
+                # Use custom color if provided
+                tile = Tile(tile_or_func_type, abs_pos, active_layer.id, custom_color=self.template_color)
                 self.placed_tiles.append(tile.id)
                 active_layer.add_map_object(tile)
                 self.workspace.tilemap.set_cell(abs_pos.x, abs_pos.y, tile)

@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import (
     QMainWindow, QMenuBar, QToolBar, QStatusBar,
     QVBoxLayout, QHBoxLayout, QWidget, QMessageBox, QSplitter
 )
-from PyQt6.QtCore import Qt, QPoint
+from PyQt6.QtCore import Qt, QPoint, QEvent
 from PyQt6.QtGui import QKeySequence, QAction
 from domain.entities.workspace import Workspace
 from domain.value_objects.references import TileListReference, FunctionalTileListReference
@@ -688,6 +688,42 @@ class MainWindow(QMainWindow):
             self._update_status_bar_cursor(point.x, point.y)
         else:
             self._update_status_bar()
+    
+    def mousePressEvent(self, event):
+        """Handle mouse press - deactivate template tool if clicking outside canvas/properties."""
+        # Get global click position
+        global_pos = event.globalPosition().toPoint()
+        
+        # Check if click is in canvas
+        canvas_rect = self.canvas.geometry()
+        canvas_global = self.canvas.mapToGlobal(self.canvas.pos())
+        clicked_in_canvas = (
+            canvas_global.x() <= global_pos.x() <= canvas_global.x() + canvas_rect.width() and
+            canvas_global.y() <= global_pos.y() <= canvas_global.y() + canvas_rect.height()
+        )
+        
+        # Check if click is in properties panel (especially Templates tab)
+        props_rect = self.properties_panel.geometry()
+        props_global = self.properties_panel.mapToGlobal(self.properties_panel.pos())
+        clicked_in_properties = (
+            props_global.x() <= global_pos.x() <= props_global.x() + props_rect.width() and
+            props_global.y() <= global_pos.y() <= props_global.y() + props_rect.height()
+        )
+        
+        # If click is outside both canvas and properties panel, deactivate template tool
+        if not clicked_in_canvas and not clicked_in_properties:
+            if hasattr(self, 'tool_manager'):
+                from editing.tools.template_tool import TemplateTool
+                from domain.enums.tool_type import ToolType
+                if isinstance(self.tool_manager.get_active_tool(), TemplateTool):
+                    self.tool_manager.set_active_tool(ToolType.BRUSH)
+                    if hasattr(self, 'canvas'):
+                        # Clear template preview
+                        self.canvas.template_preview_template = None
+                        self.canvas.template_preview_position = None
+                        self.canvas.update()
+        
+        super().mousePressEvent(event)
     
     def _update_status_bar(self):
         """Update status bar with current information."""
