@@ -9,4 +9,5 @@ class ToolType(Enum):
     ERASER = "eraser"
     FLOOD = "flood"
     TRASH = "trash"
+    TEMPLATE = "template"
 

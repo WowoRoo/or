@@ -10,7 +10,7 @@ from domain.value_objects.berlin_wall import BerlinWall
 from domain.value_objects.features_vector import FeaturesVector
 from domain.value_objects.workspace_bitmap import WorkspaceBitmap
 from domain.value_objects.references import TileListReference, FunctionalTileListReference
-from domain.entities.layer import Layer
+from domain.entities.objects_template import ObjectsTemplate
 
 
 class Workspace:
@@ -32,6 +32,7 @@ class Workspace:
         self.active_layer_id: Optional[UUID] = None
         self.features_vector: Optional[FeaturesVector] = None
         self.workspace_bitmap: Optional[WorkspaceBitmap] = None
+        self.templates: List[ObjectsTemplate] = []
         self.tile_list_reference: TileListReference = tile_list_reference
         self.functional_tile_list_reference: FunctionalTileListReference = functional_tile_list_reference
     
@@ -142,4 +143,19 @@ class Workspace:
             max_x, max_y = self.tilemap.width - 1, self.tilemap.height - 1
         
         self.berlin_wall = BerlinWall(int(min_x), int(min_y), int(max_x), int(max_y))
+    
+    def add_template(self, template: ObjectsTemplate) -> None:
+        """Add template to workspace."""
+        self.templates.append(template)
+    
+    def get_template(self, template_id: UUID) -> Optional[ObjectsTemplate]:
+        """Get template by ID."""
+        for template in self.templates:
+            if template.id == template_id:
+                return template
+        return None
+    
+    def get_all_templates(self) -> List[ObjectsTemplate]:
+        """Get all templates."""
+        return self.templates.copy()
 

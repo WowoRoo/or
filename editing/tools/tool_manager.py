@@ -7,6 +7,7 @@ from editing.tools.brush_tool import BrushTool
 from editing.tools.eraser_tool import EraserTool
 from editing.tools.flood_tool import FloodTool
 from editing.tools.trash_tool import TrashTool
+from editing.tools.template_tool import TemplateTool
 from editing.commands.command_history import CommandHistory
 from domain.entities.workspace import Workspace
 from core.events.event_bus import EventBus
@@ -36,6 +37,7 @@ class ToolManager:
         self.eraser_tool = EraserTool(self.workspace, self.event_bus, self.command_history)
         self.flood_tool = FloodTool(self.workspace, self.event_bus, self.segmentation_service, self.command_history)
         self.trash_tool = TrashTool(self.workspace, self.event_bus)
+        self.template_tool = TemplateTool(self.workspace, self.event_bus, self.command_history)
     
     def set_active_tool(self, tool_type: ToolType) -> None:
         """Set active tool."""
@@ -47,6 +49,8 @@ class ToolManager:
             self.active_tool = self.flood_tool
         elif tool_type == ToolType.TRASH:
             self.active_tool = self.trash_tool
+        elif tool_type == ToolType.TEMPLATE:
+            self.active_tool = self.template_tool
         else:
             self.active_tool = None
         

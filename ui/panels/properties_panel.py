@@ -1,8 +1,9 @@
 """Properties panel widget."""
 
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QTabWidget, QLabel, QLineEdit,
-    QSpinBox, QComboBox, QPushButton, QTextEdit
+    QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, QLabel, QLineEdit,
+    QSpinBox, QComboBox, QPushButton, QTextEdit, QListWidget, QColorDialog,
+    QDoubleSpinBox, QSlider
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QStandardItemModel, QStandardItem
@@ -43,6 +44,10 @@ class PropertiesPanel(QWidget):
         # Biometric Properties tab
         biometric_tab = self._create_biometric_properties_tab()
         self.tabs.addTab(biometric_tab, "Biometric")
+        
+        # Template Properties tab
+        template_tab = self._create_template_properties_tab()
+        self.tabs.addTab(template_tab, "Templates")
         
         layout.addWidget(self.tabs)
         layout.addStretch()
@@ -208,4 +213,185 @@ class PropertiesPanel(QWidget):
                 text += f"Total: {fv.total_features}\n"
                 text += f"Vector: {fv.vector.tolist()}"
                 self.features_text.setText(text)
+            
+            # Update template list
+            self._update_template_list()
+    
+    def _create_template_properties_tab(self) -> QWidget:
+        """Create template properties tab."""
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        
+        # Template list
+        layout.addWidget(QLabel("Available Templates:"))
+        self.template_list = QListWidget()
+        self.template_list.itemSelectionChanged.connect(self._on_template_selected)
+        layout.addWidget(self.template_list)
+        
+        # Template preview
+        layout.addWidget(QLabel("Template Preview:"))
+        self.template_preview = QTextEdit()
+        self.template_preview.setReadOnly(True)
+        self.template_preview.setMaximumHeight(150)
+        layout.addWidget(self.template_preview)
+        
+        # Color picker
+        color_layout = QHBoxLayout()
+        color_layout.addWidget(QLabel("Template Color:"))
+        self.template_color_btn = QPushButton("Choose Color")
+        self.template_color_btn.clicked.connect(self._on_choose_color)
+        self.template_color = None  # (r, g, b)
+        color_layout.addWidget(self.template_color_btn)
+        self.template_color_preview = QLabel()
+        self.template_color_preview.setMinimumSize(30, 30)
+        self.template_color_preview.setStyleSheet("background-color: white; border: 1px solid black;")
+        color_layout.addWidget(self.template_color_preview)
+        layout.addLayout(color_layout)
+        
+        # Scale control
+        scale_layout = QHBoxLayout()
+        scale_layout.addWidget(QLabel("Scale:"))
+        self.template_scale_slider = QSlider(Qt.Orientation.Horizontal)
+        self.template_scale_slider.setMinimum(10)  # 0.1 * 100
+        self.template_scale_slider.setMaximum(100)  # 1.0 * 100
+        self.template_scale_slider.setValue(100)  # Default 1.0
+        self.template_scale_slider.valueChanged.connect(self._on_scale_changed)
+        scale_layout.addWidget(self.template_scale_slider)
+        self.template_scale_label = QLabel("1.00")
+        self.template_scale_label.setMinimumWidth(40)
+        scale_layout.addWidget(self.template_scale_label)
+        layout.addLayout(scale_layout)
+        
+        # Place template button (now activates template tool)
+        self.place_template_btn = QPushButton("Activate Template Tool")
+        self.place_template_btn.setEnabled(False)
+        self.place_template_btn.clicked.connect(self._on_activate_template_tool)
+        layout.addWidget(self.place_template_btn)
+        
+        layout.addStretch()
+        return widget
+    
+    def _on_template_selected(self):
+        """Handle template selection change."""
+        selected_items = self.template_list.selectedItems()
+        if not selected_items:
+            self.place_template_btn.setEnabled(False)
+            self.template_preview.clear()
+            return
+        
+        template = selected_items[0].data(Qt.ItemDataRole.UserRole)
+        if not template:
+            self.place_template_btn.setEnabled(False)
+            return
+        
+        # Update preview
+        preview_text = f"Name: {template.name}\n"
+        preview_text += f"Tiles: {len(template.layout.tiles)}\n"
+        preview_text += f"Functional Tiles: {len(template.layout.functional_tiles)}\n"
+        preview_text += f"Origin: ({template.origin_point.x}, {template.origin_point.y})\n\n"
+        
+        # Show bounds
+        if template.layout.tiles or template.layout.functional_tiles:
+            all_points = [t[0] for t in template.layout.tiles] + [t[0] for t in template.layout.functional_tiles]
+            if all_points:
+                min_x = min(p.x for p in all_points)
+                max_x = max(p.x for p in all_points)
+                min_y = min(p.y for p in all_points)
+                max_y = max(p.y for p in all_points)
+                preview_text += f"Bounds: ({min_x}, {min_y}) to ({max_x}, {max_y})\n"
+                preview_text += f"Size: {max_x - min_x + 1} x {max_y - min_y + 1}"
+        
+        self.template_preview.setText(preview_text)
+        self.place_template_btn.setEnabled(True)
+    
+    def _on_choose_color(self):
+        """Handle color picker button click."""
+        color = QColorDialog.getColor()
+        if color.isValid():
+            self.template_color = (color.red(), color.green(), color.blue())
+            self.template_color_preview.setStyleSheet(
+                f"background-color: rgb({color.red()}, {color.green()}, {color.blue()}); "
+                "border: 1px solid black;"
+            )
+            # Update template tool if active
+            self._update_template_tool()
+    
+    def _on_scale_changed(self, value: int):
+        """Handle scale slider change."""
+        scale = value / 100.0
+        self.template_scale_label.setText(f"{scale:.2f}")
+        # Update template tool if active
+        self._update_template_tool_scale(scale)
+    
+    def _on_activate_template_tool(self):
+        """Activate template tool with selected template."""
+        selected_items = self.template_list.selectedItems()
+        if not selected_items:
+            return
+        
+        template = selected_items[0].data(Qt.ItemDataRole.UserRole)
+        if not template or not self.workspace:
+            return
+        
+        # Find main window to access tool manager
+        widget = self.parent()  # QSplitter
+        if widget:
+            widget = widget.parent()  # MainWindow
+        
+        if widget and hasattr(widget, 'tool_manager') and hasattr(widget, 'canvas'):
+            from domain.enums.tool_type import ToolType
+            from editing.tools.template_tool import TemplateTool
+            
+            # Set template tool as active
+            widget.tool_manager.set_active_tool(ToolType.TEMPLATE)
+            
+            # Set template, color and scale in tool
+            if isinstance(widget.tool_manager.template_tool, TemplateTool):
+                scale = self.template_scale_slider.value() / 100.0
+                widget.tool_manager.template_tool.set_template(template)
+                widget.tool_manager.template_tool.set_template_color(self.template_color)
+                widget.tool_manager.template_tool.set_scale(scale)
+            
+            # Update canvas
+            widget.canvas.set_active_tool(widget.tool_manager.get_active_tool())
+            widget.canvas.update()
+    
+    def _update_template_tool(self):
+        """Update template tool with current color."""
+        widget = self.parent()  # QSplitter
+        if widget:
+            widget = widget.parent()  # MainWindow
+        
+        if widget and hasattr(widget, 'tool_manager'):
+            from editing.tools.template_tool import TemplateTool
+            if isinstance(widget.tool_manager.get_active_tool(), TemplateTool):
+                widget.tool_manager.template_tool.set_template_color(self.template_color)
+                if hasattr(widget, 'canvas'):
+                    widget.canvas.update()
+    
+    def _update_template_tool_scale(self, scale: float):
+        """Update template tool with current scale."""
+        widget = self.parent()  # QSplitter
+        if widget:
+            widget = widget.parent()  # MainWindow
+        
+        if widget and hasattr(widget, 'tool_manager'):
+            from editing.tools.template_tool import TemplateTool
+            if isinstance(widget.tool_manager.get_active_tool(), TemplateTool):
+                widget.tool_manager.template_tool.set_scale(scale)
+                if hasattr(widget, 'canvas'):
+                    widget.canvas.update()
+    
+    
+    def _update_template_list(self):
+        """Update template list from workspace."""
+        self.template_list.clear()
+        if not self.workspace:
+            return
+        
+        for template in self.workspace.get_all_templates():
+            from PyQt6.QtWidgets import QListWidgetItem
+            list_item = QListWidgetItem(template.name)
+            list_item.setData(Qt.ItemDataRole.UserRole, template)
+            self.template_list.addItem(list_item)
 

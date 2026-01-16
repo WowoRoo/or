@@ -26,6 +26,10 @@ class WorkspaceCanvas(QWidget):
         self.is_dragging = False
         self.skeleton_result = None
         self.crossinizer_result = None
+        self.template_preview_position = None  # Point for template preview
+        self.template_preview_template = None  # ObjectsTemplate for preview
+        self.template_preview_color = None  # (r, g, b) for preview coloring
+        self.template_preview_scale = 1.0  # Scale factor for preview
         
         self.setMinimumSize(400, 300)
         self.setMouseTracking(True)
@@ -56,6 +60,10 @@ class WorkspaceCanvas(QWidget):
             self._draw_skeleton(painter)
         if self.show_features:
             self._draw_features(painter)
+        
+        # Draw template preview
+        if self.template_preview_template and self.template_preview_position:
+            self._draw_template_preview(painter)
     
     def _draw_grid(self, painter: QPainter) -> None:
         """Draw grid."""
@@ -224,6 +232,22 @@ class WorkspaceCanvas(QWidget):
                 # Update parent window status bar if available
                 self._update_parent_status()
                 self.last_click_pos = point
+        else:
+            # Update template preview on mouse move (without button pressed)
+            point = self._screen_to_world(event.pos())
+            if point and self.active_tool:
+                from editing.tools.template_tool import TemplateTool
+                if isinstance(self.active_tool, TemplateTool) and self.active_tool.template:
+                    self.template_preview_position = point
+                    self.template_preview_template = self.active_tool.template
+                    self.template_preview_color = self.active_tool.template_color
+                    self.template_preview_scale = self.active_tool.scale
+                    self.update()
+                else:
+                    if self.template_preview_template:
+                        self.template_preview_template = None
+                        self.template_preview_position = None
+                        self.update()
     
     def mouseReleaseEvent(self, event):
         """Handle mouse release."""
@@ -274,4 +298,209 @@ class WorkspaceCanvas(QWidget):
         if self.workspace.tilemap.is_valid_coordinate(tile_x, tile_y):
             return Point(tile_x, tile_y)
         return None
+    
+    def _draw_template_preview(self, painter: QPainter) -> None:
+        """Draw template preview with opacity (centered)."""
+        if not self.template_preview_template or not self.template_preview_position:
+            return
+        
+        # Get template center
+        template_center = self.template_preview_template.get_center()
+        
+        # Calculate offset from template center to position
+        offset = Point(
+            self.template_preview_position.x - template_center.x,
+            self.template_preview_position.y - template_center.y
+        )
+        
+        # Set opacity for preview
+        painter.setOpacity(0.5)  # 50% opacity
+        
+        # Use dictionary to track positions and count votes for each position
+        from collections import defaultdict
+        
+        position_votes = defaultdict(lambda: {'tiles': defaultdict(int), 'functional': defaultdict(int)})
+        
+        # Collect tiles from template with scaling (count votes for each position)
+        for rel_pos, tile_type in self.template_preview_template.layout.tiles:
+            # Apply scaling - scale relative position from center
+            scaled_rel_x = int((rel_pos.x - template_center.x) * self.template_preview_scale + template_center.x)
+            scaled_rel_y = int((rel_pos.y - template_center.y) * self.template_preview_scale + template_center.y)
+            scaled_rel_pos = Point(scaled_rel_x, scaled_rel_y)
+            
+            abs_pos = Point(scaled_rel_pos.x + offset.x, scaled_rel_pos.y + offset.y)
+            
+            if not self.workspace.tilemap.is_valid_coordinate(abs_pos.x, abs_pos.y):
+                continue
+            
+            # Count vote for this tile type at this position
+            position_votes[(abs_pos.x, abs_pos.y)]['tiles'][tile_type] += 1
+        
+        # Collect functional tiles from template with scaling
+        for rel_pos, func_tile_type in self.template_preview_template.layout.functional_tiles:
+            # Apply scaling - scale relative position from center
+            scaled_rel_x = int((rel_pos.x - template_center.x) * self.template_preview_scale + template_center.x)
+            scaled_rel_y = int((rel_pos.y - template_center.y) * self.template_preview_scale + template_center.y)
+            scaled_rel_pos = Point(scaled_rel_x, scaled_rel_y)
+            
+            abs_pos = Point(scaled_rel_pos.x + offset.x, scaled_rel_pos.y + offset.y)
+            
+            if not self.workspace.tilemap.is_valid_coordinate(abs_pos.x, abs_pos.y):
+                continue
+            
+            # Count vote for this functional tile type at this position
+            position_votes[(abs_pos.x, abs_pos.y)]['functional'][func_tile_type] += 1
+        
+        # Determine which tile/functional tile to draw at each position (most votes wins)
+        tiles_to_draw = {}
+        for pos, votes in position_votes.items():
+            # Functional tiles take priority over regular tiles
+            if votes['functional']:
+                # Get functional tile type with most votes
+                func_tile_type = max(votes['functional'].items(), key=lambda x: x[1])[0]
+                tiles_to_draw[pos] = (func_tile_type, True)
+            elif votes['tiles']:
+                # Get tile type with most votes
+                tile_type = max(votes['tiles'].items(), key=lambda x: x[1])[0]
+                tiles_to_draw[pos] = (tile_type, False)
+        
+        # Draw all tiles (each position only once)
+        for (pos_x, pos_y), (tile_or_func_type, is_functional) in tiles_to_draw.items():
+            x = pos_x * self.tile_size
+            y = pos_y * self.tile_size
+            
+            # Get color
+            if is_functional:
+                # Use default color for functional tiles
+                from domain.enums.functional_tile_type import FunctionalTileType
+                colors = {
+                    FunctionalTileType.PLAYER_START: (255, 0, 0),
+                    FunctionalTileType.ENEMY: (255, 165, 0),
+                    FunctionalTileType.CHECKPOINT: (0, 255, 0),
+                    FunctionalTileType.COIN: (255, 215, 0),
+                    FunctionalTileType.POWERUP: (255, 0, 255),
+                    FunctionalTileType.EXIT: (0, 255, 255),
+                }
+                default_color = colors.get(tile_or_func_type, (255, 255, 0))
+                color = QColor(*default_color)
+            else:
+                # Get color - use template color if set, otherwise default
+                if self.template_preview_color:
+                    color = QColor(*self.template_preview_color)
+                else:
+                    # Use default color for tile type
+                    from domain.enums.tile_type import TileType
+                    colors = {
+                        TileType.GRASS: (34, 139, 34),
+                        TileType.STONE: (128, 128, 128),
+                        TileType.WATER: (0, 0, 255),
+                        TileType.DIRT: (139, 69, 19),
+                        TileType.SAND: (238, 203, 173),
+                        TileType.SNOW: (255, 250, 250),
+                        TileType.LAVA: (255, 69, 0),
+                    }
+                    default_color = colors.get(tile_or_func_type, (200, 200, 200))
+                    color = QColor(*default_color)
+            
+            painter.fillRect(x, y, self.tile_size, self.tile_size, color)
+        
+        # Reset opacity
+        painter.setOpacity(1.0)
+        """Draw preview using tile position scaling (original method)."""
+        # Get template center
+        template_center = self.template_preview_template.get_center()
+        
+        # Calculate offset from template center to position
+        offset = Point(
+            self.template_preview_position.x - template_center.x,
+            self.template_preview_position.y - template_center.y
+        )
+        
+        # Use dictionary to track positions and count votes for each position
+        from collections import defaultdict
+        
+        position_votes = defaultdict(lambda: {'tiles': defaultdict(int), 'functional': defaultdict(int)})
+        
+        # Collect tiles from template with scaling (count votes for each position)
+        for rel_pos, tile_type in self.template_preview_template.layout.tiles:
+            # Apply scaling - scale relative position from center
+            scaled_rel_x = int((rel_pos.x - template_center.x) * self.template_preview_scale + template_center.x)
+            scaled_rel_y = int((rel_pos.y - template_center.y) * self.template_preview_scale + template_center.y)
+            scaled_rel_pos = Point(scaled_rel_x, scaled_rel_y)
+            
+            abs_pos = Point(scaled_rel_pos.x + offset.x, scaled_rel_pos.y + offset.y)
+            
+            if not self.workspace.tilemap.is_valid_coordinate(abs_pos.x, abs_pos.y):
+                continue
+            
+            # Count vote for this tile type at this position
+            position_votes[(abs_pos.x, abs_pos.y)]['tiles'][tile_type] += 1
+        
+        # Collect functional tiles from template with scaling
+        for rel_pos, func_tile_type in self.template_preview_template.layout.functional_tiles:
+            # Apply scaling - scale relative position from center
+            scaled_rel_x = int((rel_pos.x - template_center.x) * self.template_preview_scale + template_center.x)
+            scaled_rel_y = int((rel_pos.y - template_center.y) * self.template_preview_scale + template_center.y)
+            scaled_rel_pos = Point(scaled_rel_x, scaled_rel_y)
+            
+            abs_pos = Point(scaled_rel_pos.x + offset.x, scaled_rel_pos.y + offset.y)
+            
+            if not self.workspace.tilemap.is_valid_coordinate(abs_pos.x, abs_pos.y):
+                continue
+            
+            # Count vote for this functional tile type at this position
+            position_votes[(abs_pos.x, abs_pos.y)]['functional'][func_tile_type] += 1
+        
+        # Determine which tile/functional tile to draw at each position (most votes wins)
+        tiles_to_draw = {}
+        for pos, votes in position_votes.items():
+            # Functional tiles take priority over regular tiles
+            if votes['functional']:
+                # Get functional tile type with most votes
+                func_tile_type = max(votes['functional'].items(), key=lambda x: x[1])[0]
+                tiles_to_draw[pos] = (func_tile_type, True)
+            elif votes['tiles']:
+                # Get tile type with most votes
+                tile_type = max(votes['tiles'].items(), key=lambda x: x[1])[0]
+                tiles_to_draw[pos] = (tile_type, False)
+        
+        # Draw all tiles (each position only once)
+        for (pos_x, pos_y), (tile_or_func_type, is_functional) in tiles_to_draw.items():
+            x = pos_x * self.tile_size
+            y = pos_y * self.tile_size
+            
+            # Get color
+            if is_functional:
+                # Use default color for functional tiles
+                from domain.enums.functional_tile_type import FunctionalTileType
+                colors = {
+                    FunctionalTileType.PLAYER_START: (255, 0, 0),
+                    FunctionalTileType.ENEMY: (255, 165, 0),
+                    FunctionalTileType.CHECKPOINT: (0, 255, 0),
+                    FunctionalTileType.COIN: (255, 215, 0),
+                    FunctionalTileType.POWERUP: (255, 0, 255),
+                    FunctionalTileType.EXIT: (0, 255, 255),
+                }
+                default_color = colors.get(tile_or_func_type, (255, 255, 0))
+                color = QColor(*default_color)
+            else:
+                # Get color - use template color if set, otherwise default
+                if self.template_preview_color:
+                    color = QColor(*self.template_preview_color)
+                else:
+                    # Use default color for tile type
+                    from domain.enums.tile_type import TileType
+                    colors = {
+                        TileType.GRASS: (34, 139, 34),
+                        TileType.STONE: (128, 128, 128),
+                        TileType.WATER: (0, 0, 255),
+                        TileType.DIRT: (139, 69, 19),
+                        TileType.SAND: (238, 203, 173),
+                        TileType.SNOW: (255, 250, 250),
+                        TileType.LAVA: (255, 69, 0),
+                    }
+                    default_color = colors.get(tile_or_func_type, (200, 200, 200))
+                    color = QColor(*default_color)
+            
+            painter.fillRect(x, y, self.tile_size, self.tile_size, color)
 

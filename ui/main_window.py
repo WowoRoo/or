@@ -465,8 +465,15 @@ class MainWindow(QMainWindow):
                     template = self.template_converter.convert_bitmap_to_template(
                         bitmap, "Imported Template"
                     )
-                    # Could add template to workspace here
-                    QMessageBox.information(self, "Success", "Image imported successfully")
+                    # Add template to workspace
+                    self.workspace.add_template(template)
+                    # Update properties panel to show new template
+                    self.properties_panel.set_workspace(self.workspace)
+                    QMessageBox.information(
+                        self, "Success", 
+                        f"Image imported successfully as template '{template.name}'.\n"
+                        f"Template contains {len(template.layout.tiles)} tiles."
+                    )
                 except Exception as e:
                     QMessageBox.critical(self, "Error", f"Failed to import image: {e}")
     

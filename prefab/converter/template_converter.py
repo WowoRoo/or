@@ -33,5 +33,6 @@ class TemplateConverter:
         layout = TemplateLayout(tiles=tiles, functional_tiles=[])
         origin = Point(0, 0)  # Default origin
         
-        return ObjectsTemplate(name=name, layout=layout, origin_point=origin)
+        # Store full bitmap for proper scaling (preserves background information)
+        return ObjectsTemplate(name=name, layout=layout, origin_point=origin, source_bitmap=bitmap)
 
