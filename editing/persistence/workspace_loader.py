@@ -89,7 +89,17 @@ class WorkspaceLoader:
                 
                 if obj_data["type"] == "tile":
                     tile_type = TileType(obj_data["tile_type"])
-                    tile = Tile(tile_type, position, layer_id, obj_data.get("rotation", 0.0))
+                    custom_color = None
+                    if "custom_color" in obj_data:
+                        # Convert list back to tuple
+                        custom_color = tuple(obj_data["custom_color"])
+                    tile = Tile(
+                        tile_type, 
+                        position, 
+                        layer_id, 
+                        obj_data.get("rotation", 0.0),
+                        custom_color=custom_color
+                    )
                     tile.id = UUID(obj_data["id"])
                     layer.add_map_object(tile)
                     workspace.tilemap.set_cell(position.x, position.y, tile)
@@ -102,5 +112,59 @@ class WorkspaceLoader:
             
             workspace.add_layer(layer)
         
+        # Load templates
+        if "templates" in data:
+            for template_data in data["templates"]:
+                template = self._deserialize_template(template_data)
+                workspace.add_template(template)
+        
         return workspace
+    
+    def _deserialize_template(self, template_data: Dict[str, Any]):
+        """Deserialize template."""
+        from domain.entities.objects_template import ObjectsTemplate
+        from domain.value_objects.template_layout import TemplateLayout
+        from domain.value_objects.workspace_bitmap import WorkspaceBitmap
+        from domain.value_objects.point import Point
+        from domain.enums.tile_type import TileType
+        from domain.enums.functional_tile_type import FunctionalTileType
+        from uuid import UUID
+        import numpy as np
+        
+        # Deserialize layout
+        layout_data = template_data["layout"]
+        tiles = [
+            (Point(tile[0]["x"], tile[0]["y"]), TileType(tile[1]))
+            for tile in layout_data["tiles"]
+        ]
+        functional_tiles = [
+            (Point(func_tile[0]["x"], func_tile[0]["y"]), FunctionalTileType(func_tile[1]))
+            for func_tile in layout_data["functional_tiles"]
+        ]
+        layout = TemplateLayout(tiles=tiles, functional_tiles=functional_tiles)
+        
+        # Deserialize origin point
+        origin = Point(template_data["origin_point"]["x"], template_data["origin_point"]["y"])
+        
+        # Deserialize source_bitmap if present
+        source_bitmap = None
+        if "source_bitmap" in template_data:
+            bitmap_data = template_data["source_bitmap"]
+            bitmap_array = np.array(bitmap_data["data"], dtype=bool)
+            source_bitmap = WorkspaceBitmap(
+                data=bitmap_array,
+                width=bitmap_data["width"],
+                height=bitmap_data["height"]
+            )
+        
+        # Create template
+        template = ObjectsTemplate(
+            name=template_data["name"],
+            layout=layout,
+            origin_point=origin,
+            source_bitmap=source_bitmap
+        )
+        template.id = UUID(template_data["id"])
+        
+        return template
 

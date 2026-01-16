@@ -32,7 +32,8 @@ class WorkspaceSerializer:
             "tilemap": {
                 "width": workspace.tilemap.width,
                 "height": workspace.tilemap.height
-            }
+            },
+            "templates": [self._serialize_template(template) for template in workspace.get_all_templates()]
         }
     
     def _serialize_layer(self, layer: Layer) -> Dict[str, Any]:
@@ -58,11 +59,45 @@ class WorkspaceSerializer:
             base["type"] = "tile"
             base["tile_type"] = obj.tile_type.value
             base["rotation"] = obj.rotation
+            if obj.custom_color:
+                base["custom_color"] = list(obj.custom_color)  # Convert tuple to list for JSON
         elif isinstance(obj, FunctionalTile):
             base["type"] = "functional_tile"
             base["functional_tile_type"] = obj.functional_tile_type.value
         
         return base
+    
+    def _serialize_template(self, template) -> Dict[str, Any]:
+        """Serialize template."""
+        from domain.entities.objects_template import ObjectsTemplate
+        
+        result = {
+            "id": str(template.id),
+            "name": template.name,
+            "origin_point": {"x": template.origin_point.x, "y": template.origin_point.y},
+            "layout": {
+                "tiles": [
+                    [{"x": pos.x, "y": pos.y}, tile_type.value]
+                    for pos, tile_type in template.layout.tiles
+                ],
+                "functional_tiles": [
+                    [{"x": pos.x, "y": pos.y}, func_tile_type.value]
+                    for pos, func_tile_type in template.layout.functional_tiles
+                ]
+            }
+        }
+        
+        # Serialize source_bitmap if present
+        if template.source_bitmap:
+            # Convert bitmap to list of lists for JSON serialization
+            bitmap_data = template.source_bitmap.data.tolist()
+            result["source_bitmap"] = {
+                "data": bitmap_data,
+                "width": template.source_bitmap.width,
+                "height": template.source_bitmap.height
+            }
+        
+        return result
     
     def save_to_file(self, workspace: Workspace, filepath: str) -> None:
         """Save workspace to file."""
